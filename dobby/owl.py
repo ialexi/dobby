@@ -3,7 +3,7 @@ from thestral import Thestral
 class Pig(Thestral):
 	"""
 	This is the simplest form of dispatcher. It is a reference implementation.
-	It only responds to two commands: connect and disconnect.
+	It only responds to three commands: connect, disconnect, and gone.
 	
 	You can easily take a look at the code and see how it works. It is completely
 	trivial. The more advanced dispathcher will be the queued dispatcher.

@@ -9,18 +9,7 @@ class Dolores(Thestral):
 	Dolores is a connection manager. That's pretty much it.
 	
 	Management of who is allowed to send what (like CONTROL priviledge) is handled through
-	the caretaker, Filch. Or some other delegate, if you'd prefer.
-	
-	Connections (Thestral instances) register themselves and receive an id via an update:
-	::id, with data id (note: Dolores may change the id at any time--this occurs if one
-	reconnects).
-	
-	Example workflow: web client connects to OrbitedFirenze. This Firenze registers
-	the connection with the Dolores it is associated with, and gets a thread id.
-	It passes that to the client. The client says: WAIT! I am reconnecting!
-	And it passes some unique stuff from the previous connection. Firenze says:
-	yes, it looks good, and sends old updates, along with a ::+::reconnect confirming
-	the reconnect, in case the missed updates weren't confirmation enough.
+	the caretaker, Filch (not implemented yet). Or some other delegate, if you'd prefer.
 	"""
 	def __init__(self, id="DOLORES-SERVER"):
 		"""
@@ -52,6 +41,7 @@ class Dolores(Thestral):
 		be called more than once, which allows, for instance, multiple Twisted
 		clients to register reactor.run() or such.
 		"""
+		print "Instating Dolores High Inquisitor of Hogwarts"
 		for s in self.starters:
 			s()
 	

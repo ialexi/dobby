@@ -18,9 +18,9 @@ servers.
 
 All Thestrals must have identifiers. They should only be the same identifier when they
 are mirrors (or, to use the quantum-mechanical-sounding term, entangled) with another
-Thestral.
+Thestral—like a client and server instance of Firenze.
 
-Identifiers are usually managed by Dolores, the id manager. 
+Identifiers are usually managed by Dolores, the High Inquisitor. 
 """
 class Thestral:
 	def __init__(self):

@@ -4,7 +4,7 @@ Firenze is a server that allows long-polling. It serves its updates
 in JSON format for really easy parsing on the client.
 
 Since Firenze is always initiated by the client, client implementations
-(such as TwistedFirenze) tell Dolores about connection objects.
+(such as TwistedFirenzeServer) tell Dolores about connections.
 
 Rather simple: Firenze implements no queuing at a manager level. Instead, each individual
 connection keeps a queue of messages to send for up to RECONNECT_TIMEOUT seconds. This
@@ -17,30 +17,32 @@ it is not really a good idea to send hundreds of messages in a second to individ
 anyway—much better to send fewer, more important messages.
 
 Firenzes are synchronous. They will send whatever they have roughly whenever they get it available,
-but only when the client requests it. The client requests with its previous UID (this expires,
-of course, after only 30 seconds or so). There is a map between UIDs and Firenze instances,
-and when new clients are attached with a previous UID, the connection is supplied to that Firenze;
-the map, however, is adjusted merely by adding the new UID—not deleting the old. The Firenze instance
-knows its old and new ids; if it gets the new one, it can clear its queue up to the point it sent
-last, and start afresh with the rest. If it gets the old one, it just sends the entire queue.
+but only when the client requests it. The client requests with a token they were supplied
+previously: reconnectWith. Right now, this is a (possibly somewhat volatile under some circumstances)
+combination of the Thestral ID and the number of items sent to it last.
+
+Because Firenzes are synchronous, this is at least somewhat safe: the server never sends anything
+the client didn't ask for, so it is the client's job to ask for two things: new info, and the removal
+of old info. The number of items sent to the client last is returned to the server to tell it to remove
+that old information (the old X number of items in the queue). Anything newer is sent to the client
+(immediately if any is available, otherwise, after at most MAX_CONNECTION_LENGTH)
 
 Each Firenze instance has a timer. It expires after the manager's MAX_CONNECTION_LENGTH
 —30 seconds, by default. At this time, it will send whatever it has (nothing). However,
 if it receives a message, this timer will be replaced with one that expires after the
-DELAY_TRANSMISSION property—.5 seconds, by default. This allows bundling of messages.
+DELAY_TRANSMISSION property—.25 seconds, by default. This allows bundling of messages
+that come quickly after each other.
 
 If messages will never be bundled—or, if you want to send messages immediately, damn
 the consequences—you might as well set this to zero.
 
-Firenzes have implementations separate from the main Firenze controlling stuff. The only
-current implementation is the Twisted implementation. It is up to the implementation to
-implement the timer, but it only needs to implement changeTimeout to do so.
+The server portion is implemented separately from the main Firenze logic, so it should be
+quite possible to run Firenze on other server technologies than Twisted.
 
 The basic structure of the Twisted implementation is as such:
 * Firenze
 * FirenzeManager
-* TwistedFirenzeManager, a Firenze manager that creates TwistedFirenzes.
-* TwistedFirenzeFactory, a Twisted Factory object.
+* TwistedFirenzeServer, a Firenze manager that creates TwistedFirenzes.
 * TwistedFirenzeConnection, a Twisted protocol.
 * TwistedFirenze, an implementation of a Firenze (a Thestral) that is constructed
   with an instance of TwistedFirenzeConnection. Calls timer methods on reactor to set up callbacks, etc.
@@ -61,8 +63,14 @@ except:
 
 class Firenze(Thestral):
 	"""
-	Firenzes that have pending messages are connected to each other in a linked list.
+	Each Firenze has a queue of messages. Each Firenze doesn't last long without
+	getting that queue emptied, so it doesn't matter. If you want greater persistence
+	than what Firenze efficiently allows, you probably want a custom dispatcher.
 	
+	If you do so, please make a nice queued dispatcher named Hedwig in the
+	file owl.py. Thanks :)
+	
+	/notes to self.
 	"""
 	def __init__(self, manager):
 		self.manager = manager
