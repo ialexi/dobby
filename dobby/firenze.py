@@ -71,6 +71,7 @@ class Firenze(Thestral):
 		self.isReadyToSend = False
 		self.isWaitingToSend = False
 		self.iteration = 0
+		self.hasSentAnything = False
 	
 	def update(self, source, path, message):
 		"""
@@ -85,7 +86,7 @@ class Firenze(Thestral):
 		It will set isReadyToSend, or will send whatever is already ready to send.
 		"""
 		self.isReadyToSend = True
-		if self.isWaitingToSend:
+		if self.isWaitingToSend or not self.hasSentAnything:
 			self.isWaitingToSend = False
 			self.processQueue()
 		else:
@@ -135,6 +136,7 @@ class Firenze(Thestral):
 		self.send(headers, data)
 		self.isReadyToSend = False
 		self.isWaitingToSend = False
+		self.hasSentAnything = True
 		
 		self.setCancelTimeout(self.manager.TIMEOUT_LENGTH)
 	
@@ -205,17 +207,6 @@ class TwistedFirenze(Firenze):
 		self._currentTimeout = None
 		self._currentCancelTimeout = None
 		self.dolores = self.manager.dolores
-		reactor.callLater(1, self.testConnect)
-		t = task.LoopingCall(self.testSend)
-		self.i = 0
-		t.start(5.0)
-		
-	def testConnect(self):
-		self.dolores.update(self, "::connect", self.id + "->" + "data")
-	
-	def testSend(self):
-		self.i+=1
-		self.dolores.update(self, "data", "Hi " + str(self.i))
 	
 	def supplyConnection(self, connection):
 		self.connection = connection

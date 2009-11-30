@@ -1,4 +1,8 @@
 import sys
+from twisted.internet.protocol import Protocol, Factory
+from twisted.internet import reactor, task
+from twisted.protocols.basic import LineReceiver
+
 """
 Imperio is the text-based protocol for thestral.
 
@@ -61,7 +65,7 @@ class Imperio(object):
 			for l in lines:
 				self.receiveLine(l)
 		
-	def receiveLine(self):
+	def receiveLine(self, l):
 		"""
 		Where all the good work goes on.
 		
@@ -84,4 +88,30 @@ class Logger(Imperio):
 	"""
 	def __init__(self, f=sys.stdout):
 		Imperio.__init__(self, sender=f, should_flush=True)
+
+
+class TwistedImperioConnection(LineReceiver):
+	def connectionMade(self):
+		self.imperio = Imperio(self.factory.receiver, self)
+
+	def lineReceived(self, line):
+		# Send to so and so...
+		if line == "::exit":
+			self.transport.loseConnection()
+			return
+		self.imperio.receiveLine(line)
+	
+	def write(self, what):
+		self.transport.write(what)
+
+class TwistedImperioServer(Factory):
+	def __init__(self, dolores, receiver=None, host="localhost", port=8007):
+		self.dolores = dolores
+		if not receiver: receiver = dolores
+		self.receiver = receiver
+		self.host = host
+		self.port = port
+		self.protocol = TwistedImperioConnection
+		reactor.listenTCP(self.port, self)
+		dolores.addStarter(reactor.run)
 
