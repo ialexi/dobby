@@ -94,6 +94,7 @@ class Firenze(Thestral):
 		It will set isReadyToSend, or will send whatever is already ready to send.
 		"""
 		self.isReadyToSend = True
+		self.setCancelTimeout(-1) # Until we send
 		if self.isWaitingToSend or not self.hasSentAnything:
 			self.isWaitingToSend = False
 			self.processQueue()
@@ -242,13 +243,16 @@ class TwistedFirenze(Firenze):
 		if self._currentCancelTimeout:
 			self._currentCancelTimeout.cancel()
 			self._currentCancelTimeout = None
+		if duration < 0:
+			# No timer wanted yet
+			return
 		if duration == 0:
 			self.cancel()
 			return
 		self._currentCancelTimeout = reactor.callLater(duration, self._handleCancelTimeout)
 	
 	def _handleCancelTimeout(self):
-		self._currentTimeout = None
+		self._currentCancelTimeout = None
 		self.cancel()
 	
 	def _handleTimeout(self):

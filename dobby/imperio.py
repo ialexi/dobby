@@ -2,6 +2,10 @@ import sys
 from twisted.internet.protocol import Protocol, Factory
 from twisted.internet import reactor, task
 from twisted.protocols.basic import LineReceiver
+from wsgiref.handlers import format_date_time
+from datetime import datetime
+from time import mktime
+import urllib
 
 """
 Imperio is the text-based protocol for thestral.
@@ -112,6 +116,52 @@ class TwistedImperioServer(Factory):
 		self.host = host
 		self.port = port
 		self.protocol = TwistedImperioConnection
+		reactor.listenTCP(self.port, self)
+		dolores.addStarter(reactor.run)
+
+
+class TwistedHTTPImperioConnection(LineReceiver):
+	def connectionMade(self):
+		self.imperio = Imperio(self.factory.receiver, self)
+
+	def lineReceived(self, line):
+		# We pretend to support HTTP GET (even though logically, PUT or POST would be better)
+		# Still, it is all in the URL for simplicity
+		if line.startswith("GET"):
+			self.receivedGET = True
+			l = line.split(" ")
+			if len(l) != 3:
+				self.transport.loseConnection()
+				return
+		
+			command = urllib.unquote(l[1][1:])
+		
+			# Are we a somebody?
+			self.imperio.receiveLine(command)
+			
+			now = datetime.now()
+			stamp = mktime(now.timetuple())
+			data = "{sent:true}"
+			headers = "HTTP/1.1 200 OK\r\n"
+			headers += "Date: " + format_date_time(stamp) + "\r\n"
+			headers += "Server: Firenze instance, probably on Dolores.\r\n"
+			headers += "Content-Length: " + str(len(data)) + "\r\n"
+			headers += "Content-Type: application/json\r\n\r\n"
+			self.transport.write(headers)
+			self.transport.write(data)
+			self.transport.loseConnection()
+
+	def write(self, what):
+		self.transport.write(what)
+
+class TwistedHTTPImperioServer(Factory):
+	def __init__(self, dolores, receiver=None, host="localhost", port=8003):
+		self.dolores = dolores
+		if not receiver: receiver = dolores
+		self.receiver = receiver
+		self.host = host
+		self.port = port
+		self.protocol = TwistedHTTPImperioConnection
 		reactor.listenTCP(self.port, self)
 		dolores.addStarter(reactor.run)
 

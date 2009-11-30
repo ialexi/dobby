@@ -2,7 +2,7 @@
 # right? Don't tell them I told you. They'll come after me.
 
 from dobby.dolores import Dolores
-from dobby.imperio import Logger, TwistedImperioServer
+from dobby.imperio import Logger, TwistedImperioServer, TwistedHTTPImperioServer
 from dobby.firenze import TwistedFirenzeServer
 from dobby.owl import Pig
 
@@ -29,6 +29,7 @@ DOLORES.delegate(DISPATCHER)
 # 
 FIRENZE_SERVER = TwistedFirenzeServer(dolores=DOLORES)
 IMPERIO = TwistedImperioServer(dolores=DOLORES, receiver=DOLORES)
+IMPERIOHTTP = TwistedHTTPImperioServer(dolores=DOLORES, receiver=DOLORES)
 
 
 DOLORES.start()
