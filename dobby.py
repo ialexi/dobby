@@ -10,8 +10,8 @@ from dobby.owl import Pig
 DOLORES = Dolores()
 
 # Logger: logs everything Dolores receives to command line.
-#LOGGER = Logger()
-#DOLORES.delgate(LOGGER)
+LOGGER = Logger()
+DOLORES.delegate(LOGGER)
 
 # Dispatcher: connects, dispatches events. blah.
 DISPATCHER = Pig(dolores=DOLORES)

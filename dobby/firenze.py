@@ -84,13 +84,11 @@ class Firenze(Thestral):
 		This should be called by subclasses when they are able to send data.
 		It will set isReadyToSend, or will send whatever is already ready to send.
 		"""
-		print "RTS"
 		self.isReadyToSend = True
 		if self.isWaitingToSend:
 			self.isWaitingToSend = False
 			self.processQueue()
 		else:
-			print "SETTING TIMEOUT."
 			self.setTimeout(self.manager.MAX_CONNECTION_LENGTH)
 	
 	def addToQueue(self, source, path, message):
@@ -102,7 +100,10 @@ class Firenze(Thestral):
 		to run from a specific thread.
 		"""
 		self.queue.append({"path": path, "message": message})
-		if not self.pendingTransmission:
+		self.isWaitingToSend = True
+		
+		# If we are all set, go ahead and try to process
+		if not self.pendingTransmission and self.readyToSend:
 			self.setTimeout(self.manager.DELAY_TRANSMISSION)
 			self.pendingTransmission = True
 	
@@ -110,15 +111,16 @@ class Firenze(Thestral):
 		"""
 		Processes the queue and calls send() with the resulting data.
 		"""
+		# No longer pending
+		self.pendingTransmission = False
+		
 		if not self.isReadyToSend:
-			self.isWaitingToSend = True
 			return
 		
 		# Generate data
 		data = json.dumps({
-			"iteration": self.iteration,
 			"updates": self.queue,
-			"reconnectWith": self.id
+			"reconnectWith": self.id + "/" + str(len(self.queue))
 		}) + "\r\n\r\n"
 		
 		now = datetime.now()
@@ -130,68 +132,103 @@ class Firenze(Thestral):
 		headers += "Content-Length: " + str(len(data)) + "\r\n"
 		headers += "Content-Type: application/json\r\n\r\n"
 		
-		self.isReadyToSend = False # If they want, .send can override.
 		self.send(headers, data)
+		self.isReadyToSend = False
+		self.isWaitingToSend = False
+		
+		self.setCancelTimeout(self.manager.TIMEOUT_LENGTH)
+	
+	def cancel(self):
+		self.manager.stop(self)
+	
+	def confirm(self, count):
+		"""
+		Confirms that the first X items in the queue were sent—removing them
+		from the queue.
+		
+		Safe, because we are completely synchronous. So there.
+		"""
+		del self.queue[0:count]
+		if len(self.queue) > 0:
+			self.isWaitingToSend = True
+		else:
+			self.isWaitingToSend = False
 	
 	def send(self, headers, data):
 		pass # Implementors need to implement this.
 	
 	def setTimeout(self, delay):
 		pass # Implementors: Implement this.
+	
+	def setCancelTimeout(self, delay):
+		pass
 
 class FirenzeManager(object):
-	def __init__(self, dolores, MAX_CONNECTION_LENGTH=5, DELAY_TRANSMISSION=.5):
+	def __init__(self, dolores, MAX_CONNECTION_LENGTH=30, DELAY_TRANSMISSION=.25, TIMEOUT_LENGTH=30):
 		self.dolores = dolores
 		self.MAX_CONNECTION_LENGTH = MAX_CONNECTION_LENGTH
 		self.DELAY_TRANSMISSION = DELAY_TRANSMISSION
+		self.TIMEOUT_LENGTH = TIMEOUT_LENGTH
 	def beginNewSession(self, connection):
 		firenze = TwistedFirenze(self)
 		firenzeId = self.dolores.registerThestral(firenze)
 		firenze.supplyConnection(connection)
 
-	def resumeSession(self, uid, connection):
+	def resumeSession(self, rw, connection):
+		# The reconnectWith holds: uid/confirmCount
+		# Split by slash
+		pieces = rw.split("/")
+		
+		# get uid
+		uid = pieces[0]
+		
+		# confirm is by default 0, but read if possible
+		confirm = 0
+		if len(pieces) > 1:
+			confirm = int(pieces[1])
+		
 		firenze = self.dolores.getThestralById(uid)
 		if not firenze:
 			self.beginNewSession(connection)
 			return
+		
+		firenze.confirm(confirm)
 		firenze.supplyConnection(connection)
+	def stop(self, what):
+		self.dolores.unregisterThestral(what)
+		
 	
 
 class TwistedFirenze(Firenze):
 	def __init__(self, manager):
 		Firenze.__init__(self, manager)
 		self._currentTimeout = None
+		self._currentCancelTimeout = None
 		self.dolores = self.manager.dolores
 		reactor.callLater(1, self.testConnect)
-		reactor.callLater(1.5, self.testSend)
-		reactor.callLater(3, self.testSend)
-		reactor.callLater(3, self.testSend)
-		reactor.callLater(13, self.testSend)
-		reactor.callLater(23, self.testSend)
-		reactor.callLater(33, self.testSend)
+		t = task.LoopingCall(self.testSend)
+		self.i = 0
+		t.start(5.0)
+		
 	def testConnect(self):
 		self.dolores.update(self, "::connect", self.id + "->" + "data")
 	
 	def testSend(self):
-		self.dolores.update(self, "data", "Hi")
+		self.i+=1
+		self.dolores.update(self, "data", "Hi " + str(self.i))
 	
 	def supplyConnection(self, connection):
 		self.connection = connection
 		self.readyToSend()
 	
 	def send(self, headers, data):
-		print "Going to send..."
 		self.twistedSend(headers, data)
 	
 	def twistedSend(self, headers, data):
-		print "Sending."
 		self.connection.transport.write(headers)
 		self.connection.transport.write(data)
 		self.connection.transport.loseConnection()
 		self.connection = None
-		
-	def update(self, source, path, message):
-		reactor.callFromThread(self.addToQueue, source, path, message)
 		
 	def setTimeout(self, duration): # This should already be running in the right thread, I think.
 		if self._currentTimeout:
@@ -201,6 +238,19 @@ class TwistedFirenze(Firenze):
 			self.processQueue()
 			return
 		self._currentTimeout = reactor.callLater(duration, self._handleTimeout)
+		
+	def setCancelTimeout(self, duration): # This should already be running in the right thread, I think.
+		if self._currentCancelTimeout:
+			self._currentCancelTimeout.cancel()
+			self._currentCancelTimeout = None
+		if duration == 0:
+			self.cancel()
+			return
+		self._currentCancelTimeout = reactor.callLater(duration, self._handleCancelTimeout)
+	
+	def _handleCancelTimeout(self):
+		self._currentTimeout = None
+		self.cancel()
 	
 	def _handleTimeout(self):
 		self._currentTimeout = None
@@ -217,10 +267,14 @@ class TwistedFirenzeConnection(LineReceiver):
 		if line.startswith("GET"):
 			self.receivedGET = True
 			l = line.split(" ")
+			if len(l) != 3:
+				self.transport.loseConnection()
+				return
+			
 			uid = l[1]
 			
 			# Are we a somebody?
-			if uid.strip() == "/":
+			if uid.strip() == "":
 				self.manager.beginNewSession(self)
 			else:
 				self.manager.resumeSession(uid[1:], self)

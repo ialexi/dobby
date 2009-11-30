@@ -99,6 +99,6 @@ class Dolores(Thestral):
 		that thestral can know about it.
 		"""
 		if thestral.id in self.thestrals:
-			self.thestrals.remove(id)
-			self.update("::gone", id)
+			del self.thestrals[thestral.id]
+			self.update(self, "::gone", thestral.id)
 		

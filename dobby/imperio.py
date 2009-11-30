@@ -29,10 +29,17 @@ class Imperio(object):
 	send data, it needs a sender, which can just be any object that implements
 	a write(string) method.
 	"""
-	def __init__(self, receiver=None, sender=None):
+	def __init__(self, receiver=None, sender=None, should_flush=False):
 		self.receiver = receiver
+		self.sender = sender
+		self.should_flush = should_flush
 		self.buffer = ""
-		
+	
+	def update(self, sender, path, message):
+		if self.sender:
+			self.sender.write(path + "; " + message + "\n")
+			if self.should_flush:
+				self.sender.flush()
 	
 	def receiveData(self, data):
 		"""
@@ -75,6 +82,6 @@ class Logger(Imperio):
 	A simple subclass of Imperio which is sender-only, and which sends
 	all of the data to a file (stdout by default)
 	"""
-	def __init__(f=sys.stdout):
-		Imperio.__init__(self, None, f)
+	def __init__(self, f=sys.stdout):
+		Imperio.__init__(self, sender=f, should_flush=True)
 
