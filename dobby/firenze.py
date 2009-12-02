@@ -55,6 +55,7 @@ from thestral import Thestral
 from twisted.internet.protocol import Protocol, Factory
 from twisted.internet import reactor, task
 from twisted.protocols.basic import LineReceiver
+from twisted.web import server, resource
 
 try:
 	import simplejson
@@ -208,8 +209,6 @@ class FirenzeManager(object):
 	def stop(self, what):
 		self.dolores.unregisterThestral(what)
 		
-	
-
 class TwistedFirenze(Firenze):
 	def __init__(self, manager):
 		Firenze.__init__(self, manager)
@@ -217,19 +216,14 @@ class TwistedFirenze(Firenze):
 		self._currentCancelTimeout = None
 		self.dolores = self.manager.dolores
 	
-	def supplyConnection(self, connection):
-		self.connection = connection
+	def supplyConnection(self, request):
+		self.request = request
 		self.readyToSend()
 	
 	def send(self, headers, data):
-		self.twistedSend(headers, data)
+		self.request.write(data)
+		self.request.finish()
 	
-	def twistedSend(self, headers, data):
-		self.connection.transport.write(headers)
-		self.connection.transport.write(data)
-		self.connection.transport.loseConnection()
-		self.connection = None
-		
 	def setTimeout(self, duration): # This should already be running in the right thread, I think.
 		if self._currentTimeout:
 			self._currentTimeout.cancel()
@@ -238,7 +232,7 @@ class TwistedFirenze(Firenze):
 			self.processQueue()
 			return
 		self._currentTimeout = reactor.callLater(duration, self._handleTimeout)
-		
+
 	def setCancelTimeout(self, duration): # This should already be running in the right thread, I think.
 		if self._currentCancelTimeout:
 			self._currentCancelTimeout.cancel()
@@ -250,46 +244,36 @@ class TwistedFirenze(Firenze):
 			self.cancel()
 			return
 		self._currentCancelTimeout = reactor.callLater(duration, self._handleCancelTimeout)
-	
+
 	def _handleCancelTimeout(self):
 		self._currentCancelTimeout = None
 		self.cancel()
-	
+
 	def _handleTimeout(self):
 		self._currentTimeout = None
-		self.processQueue()
-
-class TwistedFirenzeConnection(LineReceiver):
-	def connectionMade(self):
-		self.receivedGET = False
-		self.dolores = self.factory.dolores
-		self.manager = self.factory.manager
+		self.processQueue()	
 	
-	def lineReceived(self, line):
-		# We ignore all headers. Just get on the phone!
-		if line.startswith("GET"):
-			self.receivedGET = True
-			l = line.split(" ")
-			if len(l) != 3:
-				self.transport.loseConnection()
-				return
-			
-			uid = l[1]
-			
-			# Are we a somebody?
-			if uid.strip() == "":
-				self.manager.beginNewSession(self)
-			else:
-				self.manager.resumeSession(uid[1:], self)
+		
+class TwistedFirenzeResource(resource.Resource):
+	isLeaf = True
+	def __init__(self, dolores, manager):
+		self.dolores = dolores
+		self.manager = manager		
+	def render_GET(self, request):
+		uid = "/".join(request.postpath)
+		if uid.strip() == "":
+			self.manager.beginNewSession(request)
+		else:
+			self.manager.resumeSession(uid, request)
+		return server.NOT_DONE_YET
 
-class TwistedFirenzeServer(Factory):
+class TwistedFirenzeServer(object):
 	def __init__(self, dolores, host="localhost", port=8008):
 		self.manager = FirenzeManager(dolores)
 		self.dolores = dolores
 		self.host = host
 		self.port = port
-		self.protocol = TwistedFirenzeConnection
-		reactor.listenTCP(self.port, self)
+		
+		self.site = server.Site(TwistedFirenzeResource(self.dolores, self.manager))
+		reactor.listenTCP(self.port, self.site)
 		dolores.addStarter(reactor.run)
-
-
