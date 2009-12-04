@@ -1,0 +1,6 @@
+[submodule "clients/cornelius"]
+	path = clients/cornelius
+	url = git://github.com/ialexi/cornelius.git
+[submodule "clients/pomona"]
+	path = clients/pomona
+	url = git://github.com/ialexi/pomona.git
