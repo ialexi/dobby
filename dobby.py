@@ -4,6 +4,7 @@
 from dobby.dolores import Dolores
 from dobby.imperio import Logger, TwistedImperioServer, TwistedHTTPImperioServer
 from dobby.firenze import TwistedFirenzeServer
+from dobby.dudley import TwistedDudleyServer
 from dobby.owl import Pig
 
 # Dolores: the controller
@@ -26,10 +27,14 @@ DOLORES.delegate(LOGGER)
 DISPATCHER = Pig(dolores=DOLORES)
 DOLORES.delegate(DISPATCHER)
 
-# 
+# Firenze
 FIRENZE_SERVER = TwistedFirenzeServer(dolores=DOLORES)
+
+# Imperio text-based protocol (and its HTTP version)
 IMPERIO = TwistedImperioServer(dolores=DOLORES, receiver=DOLORES)
 IMPERIOHTTP = TwistedHTTPImperioServer(dolores=DOLORES, receiver=DOLORES)
 
+# Dudley HTTP message receiver (kinda like a better Imperio HTTP)
+DUDLEY = TwistedDudleyServer(dolores=DOLORES, receiver=DOLORES)
 
 DOLORES.start()

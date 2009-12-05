@@ -119,7 +119,6 @@ class TwistedImperioServer(Factory):
 		reactor.listenTCP(self.port, self)
 		dolores.addStarter(reactor.run)
 
-
 class TwistedHTTPImperioConnection(LineReceiver):
 	def connectionMade(self):
 		self.imperio = Imperio(self.factory.receiver, self)
