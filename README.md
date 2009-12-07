@@ -1,4 +1,4 @@
-Dobby is a lightweight push server.
+Dobby (codename for Roots) is a lightweight push server.
 Its core is Thestral, a simple protocol-independent interface for pushing
 information around.
 
