@@ -132,3 +132,29 @@ I add mine in models.py:
 
 
 And that's it.
+
+
+
+How Dobby Works
+===============
+Dobby is centered around a simple interface called "Thestral."
+
+Thestral is so simple that each instance only has two things: an id and
+an "update" function that takes three arguments: a sender, a path, and a message.
+
+The Thestral interface is the model that all message receivers fill. There
+are many kinds of message receivers; for instance, dispatchers (such as "Pig"
+in "Owl.py") relate paths to other thestrals. They do so by id, and ids are
+managed by Dolores, the root message receiver.
+
+How do connections between paths and other thestrals get made? Well, by specially
+formed updates:
+	update("::connect", "id->path")
+
+The long-polling server ("Firenze") is a server that creates Firenze instances
+(which are Thestral implementors) for each connection. It registers them with
+Dolores (the root) so they get an id, and then they can be connected by anything
+that can talk to the dispatcher.
+
+
+

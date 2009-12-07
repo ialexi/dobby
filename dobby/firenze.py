@@ -43,7 +43,7 @@ The basic structure of the Twisted implementation is as such:
 * Firenze
 * FirenzeManager
 * TwistedFirenzeServer, a Firenze manager that creates TwistedFirenzes.
-* TwistedFirenzeConnection, a Twisted protocol.
+* TwistedFirenzeResource, a Twisted.Web Resource
 * TwistedFirenze, an implementation of a Firenze (a Thestral) that is constructed
   with an instance of TwistedFirenzeConnection. Calls timer methods on reactor to set up callbacks, etc.
 """
