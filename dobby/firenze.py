@@ -58,7 +58,7 @@ from twisted.protocols.basic import LineReceiver
 from twisted.web import server, resource
 
 try:
-	import simplejson
+	import simplejson as json
 except:
 	import json
 
